@@ -25,7 +25,7 @@ int keyStates[256] = {0}; // Keyboard input handler
 int gameStarted = 0; // 0: Start Screen, 1: Game Running
 int gameWon = 0; // 0: Not won, 1: Win Screen
 int keysCollected = 0; // Current number of keys picked up
-int keysRequired = 0; // Number of keys needed to win (1-5)
+int keysRequired = 0; // Number of keys needed to win
 int gameIntro = 0; // 0: Game, 1: Intro Screen
 int playerPassedExitCheck = 0; // Flag set when player touches the door
 
@@ -43,7 +43,7 @@ Sprite keySprites[MAX_KEYS];
 // MATH
 
 float degToRad(float a) { return a*PI/180.0; }
-float FixAng(float a) { if(a>2*PI){ a-=2*PI;} if(a<0){ a+=2*PI;} return a; } // Fixed to use 2*PI
+float FixAng(float a) { if(a>2*PI){ a-=2*PI;} if(a<0){ a+=2*PI;} return a; }
 
 float dist(float ax, float ay, float bx, float by)
 {
@@ -69,7 +69,6 @@ void drawStartScreen()
                 int green = start[pixel+1];
                 int blue  = start[pixel+2];
                 
-                // Draw only non-white pixels
                 if(!CHECK_WHITE_PIXEL(red, green, blue)) 
                 {
                     glPointSize(1);
@@ -139,75 +138,157 @@ void drawWinScreen()
     }
 }
 
-// --- MAP & COLLISION ---
+// MAP GENERATION & COLLISION
 
-int mapX=16, mapY=16, mapS=64; // Map
-int map[]=
+int mapX=16, mapY=16, mapS=64; // Map dimensions
+// Dynamic map arrays
+int map[16*16]; 
+int mapFloor[16*16];
+int mapCeiling[16*16]; 
+
+void initializeFloorCeiling() {
+    int i;
+    for(i = 0; i < mapX * mapY; i++) {
+        mapFloor[i] = 2; // Texture T_2
+        mapCeiling[i] = 3; // Texture T_3
+    }
+}
+
+// Initializes the map
+void initializeMap()
 {
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-    1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,1,
-    1,0,1,0,0,1,0,1,1,1,0,1,0,1,0,1,
-    1,0,1,0,0,0,0,1,0,0,0,0,0,1,0,1,
-    1,0,1,1,1,1,0,1,0,1,1,1,1,1,0,1,
-    1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,
-    1,1,1,1,0,1,1,0,1,1,0,1,1,0,1,1,
-    1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,1,
-    1,0,1,1,1,1,1,1,0,1,1,1,0,1,0,1,
-    1,0,1,0,0,1,0,0,0,0,0,1,0,1,0,1,
-    1,0,0,0,1,1,1,1,1,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,0,0,0,1,0,0,0,1,0,1,
-    1,0,1,0,0,0,0,0,0,1,0,1,1,1,0,1,
-    1,1,1,0,1,1,1,0,1,1,0,0,0,1,0,1,
-    1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,4,
-    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-};
+    int x, y;
+    for (y = 0; y < mapY; y++) {
+        for (x = 0; x < mapX; x++) {
+            map[y * mapX + x] = 1;
+        }
+    }
+}
 
-int mapFloor[]= // Floor
+// Maze generation
+void generateMaze()
 {
-    2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-    2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-    2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-    2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-    2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-    2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-    2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-    2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-    2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-    2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-    2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-    2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-    2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-    2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-    2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-    2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-};
+    int stackX[256];
+    int stackY[256];
+    int top = 0;
+    int x, y, nx, ny, i, dir;
+    int dx[] = {0, 0, 2, -2}; // Directions (2 steps)
+    int dy[] = {2, -2, 0, 0}; 
 
-int mapCeiling[]= // Ceiling
-{
-    3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
-    3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
-    3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
-    3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
-    3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
-    3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
-    3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
-    3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
-    3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
-    3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
-    3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
-    3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
-    3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
-    3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
-    3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
-    3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
-};
+    // 1. Initialize all cells to walls
+    initializeMap();
 
-// Function to spawn keys
+    // 2. Start from an initial point
+    x = 1; y = 1;
+    map[y * mapX + x] = 0; // Carve out the starting cell
+
+    // Push starting cell to stack
+    stackX[top] = x;
+    stackY[top] = y;
+    top++;
+
+    while (top > 0) 
+    {
+        // Peek current cell
+        x = stackX[top-1];
+        y = stackY[top-1];
+
+        // 3. Randomly shuffle directions
+        int directions[4] = {0, 1, 2, 3};
+        for (i = 0; i < 4; i++) {
+            int j = rand() % 4;
+            int temp = directions[i];
+            directions[i] = directions[j];
+            directions[j] = temp;
+        }
+
+        int foundNeighbor = 0;
+        // 4. Try all shuffled directions
+        for (i = 0; i < 4; i++) {
+            dir = directions[i];
+            nx = x + dx[dir];
+            ny = y + dy[dir];
+
+            // Check boundaries (must be an interior cell and not the border)
+            if (nx > 0 && nx < mapX - 1 && ny > 0 && ny < mapY - 1) 
+            {
+                int next_mp = ny * mapX + nx;
+                
+                // If the next cell is a wall, carve a path
+                if (map[next_mp] == 1) 
+                {
+                    // Carve out cell in between
+                    map[(y + dy[dir] / 2) * mapX + (x + dx[dir] / 2)] = 0;
+                    // Carve out new cell
+                    map[next_mp] = 0;
+
+                    // Push new cell
+                    stackX[top] = nx;
+                    stackY[top] = ny;
+                    top++;
+                    foundNeighbor = 1;
+                    break; // Move to new cell
+                }
+            }
+        }
+        
+        if (!foundNeighbor) {
+            // Backtrack
+            top--;
+        }
+    }
+}
+
+// Place the door (4)
+void placeDoor() {
+    int rx, ry, mp;
+    int found = 0;
+    
+    while (!found) {
+        
+        // Randomly pick one of the four edges (x=0, x=15, y=0, y=15)
+        int edge = rand() % 4;
+        
+        if (edge == 0) { // Top border
+            rx = (rand() % (mapX - 2)) + 1;
+            ry = 0;
+        } else if (edge == 1) { // Bottom border
+            rx = (rand() % (mapX - 2)) + 1;
+            ry = mapY - 1;
+        } else if (edge == 2) { // Left border
+            rx = 0;
+            ry = (rand() % (mapY - 2)) + 1;
+        } else { // Right border
+            rx = mapX - 1;
+            ry = (rand() % (mapY - 2)) + 1;
+        }
+
+        mp = ry * mapX + rx;
+        
+        int nx = rx, ny = ry;
+        if (edge == 0) ny = 1; // Cell below
+        if (edge == 1) ny = mapY - 2; // Cell above
+        if (edge == 2) nx = 1; // Cell to the right
+        if (edge == 3) nx = mapX - 2; // Cell to the left
+        
+        // Check the spot is not the player spawn
+        if (rx != 1 || ry != 1) {
+            // Check if the adjacent interior cell is a walkable (0)
+            if (map[ny * mapX + nx] == 0) {
+                map[mp] = 4; // Place door
+                found = 1;
+            }
+        }
+    }
+}
+
+
+// Key spawn function
 void findRandomEmptySpot(float *outX, float *outY) {
     int rx, ry, mp;
     int found = 0;
     while (!found) {
-        // Generate random map coordinates
+        // Map coord RNG
         rx = (rand() % (mapX - 2)) + 1;
         ry = (rand() % (mapY - 2)) + 1;
         
@@ -215,9 +296,23 @@ void findRandomEmptySpot(float *outX, float *outY) {
         
         // Check if the cell is walkable (value 0)
         if (map[mp] == 0 && !(rx == 1 && ry == 1)) {
-            *outX = rx * mapS + mapS / 2.0f;
-            *outY = ry * mapS + mapS / 2.0f;
-            found = 1;
+            // Check if another key is already here
+            int i;
+            int keyOverlap = 0;
+            for(i = 0; i < MAX_KEYS; i++) {
+                int keyMx = (int)(keySprites[i].x) >> 6;
+                int keyMy = (int)(keySprites[i].y) >> 6;
+                if(keySprites[i].active && keyMx == rx && keyMy == ry) {
+                    keyOverlap = 1;
+                    break;
+                }
+            }
+            
+            if (!keyOverlap) {
+                *outX = rx * mapS + mapS / 2.0f;
+                *outY = ry * mapS + mapS / 2.0f;
+                found = 1;
+            }
         }
     }
 }
@@ -265,16 +360,15 @@ void drawRays3D()
     int r,mx,my,mp,dof,y,i;
     float rx,ry,ra,xo,yo,disT;
 
-    // Start angle is Player Angle (pa) minus half of the Field of View (30 degrees)
     ra = pa - DR*30.0f;
-    ra = FixAng(ra); // Normalize angle
+    ra = FixAng(ra); 
 
-    for(r=0;r<128;r++) // Loop through 128 rays
+    for(r=0;r<128;r++) 
     {
-        float disH, hx, hy; // Horizontal hit
+        float disH, hx, hy; 
         int hMapValue;
         float aTan;
-        float disV, vx, vy; // Vertical hit
+        float disV, vx, vy; 
         int vMapValue;
         float nTan;
         float ca;
@@ -284,88 +378,48 @@ void drawRays3D()
         int texX;
         int wallType;
 
-        // Horizontal Check (Checking for horizontal grid lines)
-        dof=0;
-        disH=1e6f;
-        hMapValue=0;
-        aTan = -1.0f / tanf(ra);
-
-        // Looking Up (ra > PI)
-        if(ra > PI) { 
-            ry = (((int)py>>6)<<6) - 0.0001f; // Snap to the horizontal line just above player
-            rx = (py - ry) * aTan + px; // Calculate x intersection
-            yo = -64; 
-            xo = -yo * aTan; 
-        }
-        // Looking Down (ra < PI)
-        else { 
-            ry = (((int)py>>6)<<6) + 64; // Snap to the horizontal line just below player
-            rx = (py - ry) * aTan + px; // Calculate x intersection
-            yo = 64; 
-            xo = -yo * aTan; 
-        }
-        // Looking Straight Left or Right (0 or PI)
+        // Horizontal Check 
+        dof=0; disH=1e6f; hMapValue=0; aTan = -1.0f / tanf(ra);
+        if(ra > PI) { ry = (((int)py>>6)<<6) - 0.0001f; rx = (py - ry) * aTan + px; yo = -64; xo = -yo * aTan; }
+        else { ry = (((int)py>>6)<<6) + 64; rx = (py - ry) * aTan + px; yo = 64; xo = -yo * aTan; }
         if(fabsf(ra - 0.0f) < 1e-6 || fabsf(ra - PI) < 1e-6) { rx = px; ry = py; dof = 8; } 
-
-        while(dof < 8) // Limit ray distance to 8 cells
+        while(dof < 8) 
         {
             mx = (int)(rx) >> 6; my = (int)(ry) >> 6; mp = my * mapX + mx;
             if(mp >= 0 && mp < mapX*mapY) {
-                // If the ray hits a wall (1) OR a door (4)
                 if(map[mp] == 1 || map[mp] == 4) { 
                     hx = rx; hy = ry; disH = dist(px,py,hx,hy); 
-                    hMapValue = map[mp]; // Store map value
-                    dof = 8; // Stop the ray
-                } else { // Ray passes through open space
-                    rx += xo; ry += yo; dof++; 
-                }
-            } else { rx += xo; ry += yo; dof++; } // Out of map bounds
+                    hMapValue = map[mp]; 
+                    dof = 8; 
+                } else { rx += xo; ry += yo; dof++; }
+            } else { rx += xo; ry += yo; dof++; } 
         }
 
-        // Vertical Check (Checking for vertical grid lines)
-        dof = 0;
-        disV = 1e6f;
-        vMapValue=0;
-        nTan = -tanf(ra);
-
-        // Looking Left (ra > P2 && ra < P3)
-        if(ra > P2 && ra < P3) { 
-            rx = (((int)px>>6)<<6) - 0.0001f; // Snap to the vertical line
-            ry = (px - rx) * nTan + py; 
-            xo = -64; 
-            yo = -xo * nTan; 
-        }
-        // Looking Right
-        else { 
-            rx = (((int)px>>6)<<6) + 64; // Snap to the vertical line
-            ry = (px - rx) * nTan + py; 
-            xo = 64; 
-            yo = -xo * nTan; 
-        }
+        // Vertical Check
+        dof = 0; disV = 1e6f; vMapValue=0; nTan = -tanf(ra);
+        if(ra > P2 && ra < P3) { rx = (((int)px>>6)<<6) - 0.0001f; ry = (px - rx) * nTan + py; xo = -64; yo = -xo * nTan; }
+        else { rx = (((int)px>>6)<<6) + 64; ry = (px - rx) * nTan + py; xo = 64; yo = -xo * nTan; }
         if(fabsf(ra - P2) < 1e-6 || fabsf(ra - P3) < 1e-6) { rx = px; ry = py; dof = 8; } 
 
         while(dof < 8)
         {
             mx = (int)(rx) >> 6; my = (int)(ry) >> 6; mp = my * mapX + mx;
             if(mp >= 0 && mp < mapX*mapY) {
-                // If the ray hits a wall (1) OR a door (4)
                 if(map[mp] == 1 || map[mp] == 4) { 
                     vx = rx; vy = ry; disV = dist(px,py,vx,vy);
-                    vMapValue = map[mp]; // Store map value
+                    vMapValue = map[mp]; 
                     dof = 8; 
-                } else {
-                    rx += xo; ry += yo; dof++; 
-                }
-            } else { rx += xo; ry += yo; dof++; } // Out of map bounds
+                } else { rx += xo; ry += yo; dof++; }
+            } else { rx += xo; ry += yo; dof++; } 
         }
 
         // Final Distance Selection & Fish-eye Correction
         if(disV < disH) { rx = vx; ry = vy; disT = disV; wallType = vMapValue; shade = 1.0f; }
         else { rx = hx; ry = hy; disT = disH; wallType = hMapValue; shade = 0.7f; }
 
-        ca = pa - ra; // Angle difference
-        ca = FixAng(ca); // Normalize
-        disT *= cosf(ca); // Fish-eye correction
+        ca = pa - ra; 
+        ca = FixAng(ca); 
+        disT *= cosf(ca); 
 
         // Store distance in the depth buffer
         for(i = r*8; i < (r+1)*8 && i < 1024; i++) {
@@ -393,11 +447,9 @@ void drawRays3D()
             float caFix = cosf(pa - currentRa); 
             ceilingDist = (mapS * 512.0f) / (dy * 2.0f * caFix);
             
-            // Calculate world coordinates for ceiling hit point
             wx = px + cosf(currentRa) * ceilingDist;
             wy = py + sinf(currentRa) * ceilingDist;
             
-            // Map world coordinates
             localX = ((int)wx) % 32;
             localY = ((int)wy) % 32;
             if(localX < 0) localX += 32;
@@ -415,7 +467,7 @@ void drawRays3D()
                 int blue  = T_3[ceilingPixel+2];
                 
                 glColor3ub((GLubyte)red, (GLubyte)green, (GLubyte)blue);
-                glPointSize(8); // Draw the pixel block
+                glPointSize(8); 
                 glBegin(GL_POINTS);
                 glVertex2i(r*8, y);
                 glEnd();
@@ -424,26 +476,22 @@ void drawRays3D()
 
         // Wall Texture Calculation
         if(disV < disH) {
-            // Vertical wall hit: X texture coordinate is based on Y world coordinate
             texX = ((int)ry) % 32;
             if(texX < 0) texX += 32;
             shade = 1.0f;
         } else {
-            // Horizontal wall hit: X texture coordinate is based on X world coordinate
             texX = ((int)rx) % 32;
             if(texX < 0) texX += 32;
-            shade = 0.7f; // Darker shade for horizontal walls
+            shade = 0.7f; 
         }
         
         // Draw Wall
         for(y = 0; y < (int)lineH; y++)
         {
-            // Calculate Y texture coordinate
             int texY = (y * 32) / (int)lineH;
             int pixel;
             int red, green, blue;
             
-            // Boundary checks
             if(texY < 0) texY = 0; if(texY >= 32) texY = 31;
             if(texX < 0) texX = 0; if(texX >= 32) texX = 31;
 
@@ -451,12 +499,10 @@ void drawRays3D()
             if(pixel >= 0 && pixel < 32*32*3 - 2)
             {
                 if(wallType == 4) {
-                    // Door always draws T_4
                     red   = (int)(T_4[pixel+0] * shade);
                     green = (int)(T_4[pixel+1] * shade);
                     blue  = (int)(T_4[pixel+2] * shade);
                 } else {
-                    // Regular Wall (T_1)
                     red   = (int)(T_1[pixel+0] * shade);
                     green = (int)(T_1[pixel+1] * shade);
                     blue  = (int)(T_1[pixel+2] * shade);
@@ -484,14 +530,11 @@ void drawRays3D()
             
             float currentRa = ra;
             float caFix = cosf(pa - currentRa);
-            // Calculate distance to the point on the floor
             floorDist = (mapS * 512.0f) / (dy * 2.0f * caFix);
             
-            // Calculate world coordinates
             wx = px + cosf(currentRa) * floorDist;
             wy = py + sinf(currentRa) * floorDist;
             
-            // Map world coordinates to 32x32 texture coordinates
             localX = ((int)wx) % 32;
             localY = ((int)wy) % 32;
             if(localX < 0) localX += 32;
@@ -516,7 +559,6 @@ void drawRays3D()
             }
         }
         
-        // Increment angle for the next ray
         ra += DR*0.5f;
         ra = FixAng(ra);
     }
@@ -533,58 +575,47 @@ void drawSprite(Sprite *s, const unsigned char *tex, int texWidth, int texHeight
     float spriteWidth;
     int spriteScreenX;
     int startX, endX, startY, endY;
-    int x, y; // Declared x and y here for C89 compliance
+    int x, y; 
     
     if(!s->active) return;
     
-    // Calculate player-to-sprite vector
     spx = s->x - px;
     spy = s->y - py;
     
-    // Calculate sprite angle relative to player view angle
     spriteAngle = atan2f(spy, spx) - pa;
     while(spriteAngle < -PI) spriteAngle += 2*PI;
     while(spriteAngle > PI) spriteAngle -= 2*PI;
     
-    // Frustum Culling: Only draw sprites within the 60 degree field of view
     if(spriteAngle < -DR * 30.0f || spriteAngle > DR * 30.0f) return;
     
-    // Calculate distance
     spriteDist = sqrtf(spx*spx + spy*spy);
     if(spriteDist < 1) return;
     
-    // Calculate projected height
     spriteHeight = (mapS * 512.0f) / spriteDist;
     if(spriteHeight > 512) spriteHeight = 512;
     
-    spriteWidth = spriteHeight; // Keep aspect ratio
+    spriteWidth = spriteHeight; 
     
-    // Calculate screen X position
     spriteScreenX = (int)(512 + (spriteAngle / (DR * 0.5f) * 8)); 
     
-    // Calculate screen boundaries
     startX = spriteScreenX - (int)(spriteWidth / 2);
     endX = spriteScreenX + (int)(spriteWidth / 2);
     startY = 256 - (int)(spriteHeight / 2);
     endY = 256 + (int)(spriteHeight / 2);
     
-    // Clamp to screen edges
     if(startX < 0) startX = 0;
     if(endX > 1024) endX = 1024;
     if(startY < 0) startY = 0;
     if(endY > 512) endY = 512;
     
-    // Draw key sprite
     for(x = startX; x < endX; x++)
     {
         if(x < 0 || x >= 1024) continue;
         
-        // Depth check
         if(spriteDist >= depthBuffer[x]) continue;
         
         for(y = startY; y < endY; y++)
         {
-            // Normalize coordinates
             float nx = (float)(x - startX) / spriteWidth;
             float ny = (float)(y - startY) / spriteHeight;
             
@@ -611,7 +642,6 @@ void drawSprite(Sprite *s, const unsigned char *tex, int texWidth, int texHeight
             
             if(drawPixel)
             {
-                // Color for the key
                 glColor3f(1.0f, 0.84f, 0.0f);
                 glPointSize(1);
                 glBegin(GL_POINTS);
@@ -632,7 +662,6 @@ void updateMovement()
     int moved = 0;
     int i;
     
-    // Only update movement if the game is actively running 
     if(!gameStarted || gameWon || gameIntro) return;
     
     newX = px;
@@ -690,7 +719,12 @@ void updateMovement()
     // Exit check
     if(playerPassedExitCheck)
     {
-        gameWon = 1; // Win screen
+        // Give a small delay before the win screen appears
+        if (keysCollected >= keysRequired) {
+            gameWon = 1; 
+        } else {
+             playerPassedExitCheck = 0; // Should not happen due to checkCollision, but for safety
+        }
     }
     
     if(moved || gameWon) {
@@ -717,6 +751,7 @@ void display()
     }
     else // (Maze + Keys)
     {
+        // Draw black background (floor/ceiling fallback)
         glColor3f(0.2f, 0.2f, 0.2f);
         glBegin(GL_QUADS);
         glVertex2i(0, 0);
@@ -743,48 +778,59 @@ void display()
         if (keysCollected < keysRequired) {
             drawText("FIND THE KEYS TO ESCAPE (W, A, S, D)", 150, 500, 1.0f, 0.0f, 0.0f); // (Locked)
         } else {
-            drawText("EXIT IS OPEN!", 150, 500, 0.0f, 1.0f, 0.0f); // (Unlocked)
+            drawText("EXIT IS OPEN! PRESS W TO ESCAPE.", 150, 500, 0.0f, 1.0f, 0.0f); // (Unlocked)
         }
     }
     
     glutSwapBuffers();
 }
 
+void resetGame() {
+    float keyX, keyY;
+    int i; 
+    
+    // Generate a new random map
+    generateMaze(); 
+    placeDoor();    
+    initializeFloorCeiling(); 
+
+    // Reset player
+    px = 1 * mapS + mapS/2;
+    py = 1 * mapS + mapS/2;
+    pa = 0;
+    pdx = cosf(pa) * 5.0f;
+    pdy = sinf(pa) * 5.0f;
+    
+    keysCollected = 0;
+    playerPassedExitCheck = 0;
+    
+    // Re-initialize key states
+    keysRequired = (rand() % MAX_KEYS) + 1; // Keys required (1-5)
+
+    for(i = 0; i < keysRequired; i++)
+    {
+        findRandomEmptySpot(&keyX, &keyY);
+        keySprites[i].x = keyX;
+        keySprites[i].y = keyY;
+        keySprites[i].active = 1;
+    }
+    // Deactivate unused slots
+    for(i = keysRequired; i < MAX_KEYS; i++) {
+        keySprites[i].active = 0;
+    }
+}
+
+
 void keyDown(unsigned char key, int x, int y)
 {
-    float keyX, keyY;
-    int i;
-
     if(gameWon)
     {
         // Reset game state after winning
         gameWon = 0;
         gameStarted = 0;
         gameIntro = 0;
-        keysCollected = 0;
-        playerPassedExitCheck = 0;
         
-        // Reset player
-        px = 1 * mapS + mapS/2;
-        py = 1 * mapS + mapS/2;
-        pa = 0;
-        pdx = cosf(pa) * 5.0f;
-        pdy = sinf(pa) * 5.0f;
-        
-        // Re-initialize key states
-        keysRequired = (rand() % MAX_KEYS) + 1; // Keys required
-
-        for(i = 0; i < keysRequired; i++)
-        {
-            findRandomEmptySpot(&keyX, &keyY);
-            keySprites[i].x = keyX;
-            keySprites[i].y = keyY;
-            keySprites[i].active = 1;
-        }
-        // Deactivate unused slots
-        for(i = keysRequired; i < MAX_KEYS; i++) {
-            keySprites[i].active = 0;
-        }
+        resetGame(); // Regenerate map, keys, and player position
         
         glutPostRedisplay();
         return;
@@ -831,37 +877,10 @@ void resize(int w, int h)
 
 void init()
 {
-    float keyX, keyY;
-    int i; 
-    
     glClearColor(0.3f, 0.3f, 0.3f, 0);
     gluOrtho2D(0, 1024, 512, 0); 
 
-    // Initial player position (center of tile 1,1)
-    px = 1 * mapS + mapS/2;
-    py = 1 * mapS + mapS/2;
-
-    pa = 0; 
-    pdx = cosf(pa) * 5.0f;
-    pdy = sinf(pa) * 5.0f;
-    
-    // Initial key setup
-    keysRequired = (rand() % MAX_KEYS) + 1;
-    keysCollected = 0;
-    
-    for(i = 0; i < keysRequired; i++)
-    {
-        findRandomEmptySpot(&keyX, &keyY);
-        keySprites[i].x = keyX;
-        keySprites[i].y = keyY;
-        keySprites[i].active = 1;
-    }
-    // Deactivate unused slots
-    for(i = keysRequired; i < MAX_KEYS; i++) {
-        keySprites[i].active = 0;
-    }
-    
-    playerPassedExitCheck = 0;
+    resetGame(); // Initial game setup
 }
 
 int main(int argc, char* argv[])
@@ -893,4 +912,3 @@ int main(int argc, char* argv[])
     glutMainLoop();
     return 0;
 }
-
