@@ -31,7 +31,7 @@ int playerPassedExitCheck = 0; // Flag set when player touches the door
 
 float depthBuffer[1024]; // Stores distance to the closest wall for each vertical line
 
-// Sprite structure for keys
+// Sprite structure for key
 typedef struct {
     float x;
     float y;
@@ -40,10 +40,10 @@ typedef struct {
 
 Sprite keySprites[MAX_KEYS];
 
-// --- MATH ---
+// MATH
 
 float degToRad(float a) { return a*PI/180.0; }
-float FixAng(float a) { if(a>2*PI){ a-=2*PI;} if(a<0){ a+=2*PI;} return a; } // Fixed to use 2*PI for radians
+float FixAng(float a) { if(a>2*PI){ a-=2*PI;} if(a<0){ a+=2*PI;} return a; } // Fixed to use 2*PI
 
 float dist(float ax, float ay, float bx, float by)
 {
@@ -52,7 +52,7 @@ float dist(float ax, float ay, float bx, float by)
 
 #define CHECK_WHITE_PIXEL(r, g, b) (r == 255 && g == 255 && b == 255)
 
-// --- SCREEN RENDERING (2D) ---
+// SCREEN RENDERING (2D)
 
 void drawStartScreen()
 {
@@ -98,7 +98,6 @@ void drawIntroScreen()
                 int green = intro[pixel+1];
                 int blue  = intro[pixel+2];
                 
-                // Draw only non-white pixels
                 if(!CHECK_WHITE_PIXEL(red, green, blue)) 
                 {
                     glPointSize(1);
@@ -127,7 +126,6 @@ void drawWinScreen()
                 int green = win[pixel+1];
                 int blue  = win[pixel+2];
                 
-                // Draw only non-white pixels
                 if(!CHECK_WHITE_PIXEL(red, green, blue))
                 {
                     glPointSize(1);
@@ -143,7 +141,7 @@ void drawWinScreen()
 
 // --- MAP & COLLISION ---
 
-int mapX=16, mapY=16, mapS=64; // Map size and cell size
+int mapX=16, mapY=16, mapS=64; // Map
 int map[]=
 {
     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
@@ -164,7 +162,7 @@ int map[]=
     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
 };
 
-int mapFloor[]= // Floor texture index
+int mapFloor[]= // Floor
 {
     2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
     2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
@@ -184,7 +182,7 @@ int mapFloor[]= // Floor texture index
     2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
 };
 
-int mapCeiling[]= // Ceiling texture index
+int mapCeiling[]= // Ceiling
 {
     3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
     3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
@@ -231,25 +229,25 @@ int checkCollision(float x, float y)
     int my = (int)(y) >> 6;
     int mp = my * mapX + mx;
 
-    if(mp < 0 || mp >= mapX * mapY) return 1; // Out of bounds is a wall
+    if(mp < 0 || mp >= mapX * mapY) return 1;
 
     if(map[mp] == 1) return 1; // Regular wall
     
-    // Door (4) logic: Check if required keys are collected
+    // Door logic
     if(map[mp] == 4) {
         if(keysCollected >= keysRequired) {
-            // Player has enough keys and hits the exit door.
+            // Player has enough keys
             playerPassedExitCheck = 1; 
-            return 0; // Allowed to pass through (triggers game win on move update)
+            return 0; // Win state trigger
         } else {
-            return 1; // Blocked: Need more keys
+            return 1; // Blocked
         }
     }
 
     return 0;
 }
 
-// --- HUD ---
+// HUD
 
 void drawText(char *string, int x, int y, float r, float g, float b)
 {
@@ -261,7 +259,7 @@ void drawText(char *string, int x, int y, float r, float g, float b)
 }
 
 
-// --- RAYCASTING & RENDERING ---
+// RAYCASTING & RENDERING
 void drawRays3D()
 {
     int r,mx,my,mp,dof,y,i;
@@ -271,12 +269,12 @@ void drawRays3D()
     ra = pa - DR*30.0f;
     ra = FixAng(ra); // Normalize angle
 
-    for(r=0;r<128;r++) // Loop through 128 rays (for 1024 pixel width, 8 pixels per ray)
+    for(r=0;r<128;r++) // Loop through 128 rays
     {
-        float disH, hx, hy; // Horizontal hit data
+        float disH, hx, hy; // Horizontal hit
         int hMapValue;
         float aTan;
-        float disV, vx, vy; // Vertical hit data
+        float disV, vx, vy; // Vertical hit
         int vMapValue;
         float nTan;
         float ca;
@@ -286,7 +284,7 @@ void drawRays3D()
         int texX;
         int wallType;
 
-        // --- Horizontal Check (Checking for horizontal grid lines) ---
+        // Horizontal Check (Checking for horizontal grid lines)
         dof=0;
         disH=1e6f;
         hMapValue=0;
@@ -309,11 +307,11 @@ void drawRays3D()
         // Looking Straight Left or Right (0 or PI)
         if(fabsf(ra - 0.0f) < 1e-6 || fabsf(ra - PI) < 1e-6) { rx = px; ry = py; dof = 8; } 
 
-        while(dof < 8) // Limit ray distance to 8 map cells
+        while(dof < 8) // Limit ray distance to 8 cells
         {
             mx = (int)(rx) >> 6; my = (int)(ry) >> 6; mp = my * mapX + mx;
             if(mp >= 0 && mp < mapX*mapY) {
-                // If the ray hits a wall (1) OR a door (4), record the hit.
+                // If the ray hits a wall (1) OR a door (4)
                 if(map[mp] == 1 || map[mp] == 4) { 
                     hx = rx; hy = ry; disH = dist(px,py,hx,hy); 
                     hMapValue = map[mp]; // Store map value
@@ -324,7 +322,7 @@ void drawRays3D()
             } else { rx += xo; ry += yo; dof++; } // Out of map bounds
         }
 
-        // --- Vertical Check (Checking for vertical grid lines) ---
+        // Vertical Check (Checking for vertical grid lines)
         dof = 0;
         disV = 1e6f;
         vMapValue=0;
@@ -332,37 +330,36 @@ void drawRays3D()
 
         // Looking Left (ra > P2 && ra < P3)
         if(ra > P2 && ra < P3) { 
-            rx = (((int)px>>6)<<6) - 0.0001f; // Snap to the vertical line just left of player
+            rx = (((int)px>>6)<<6) - 0.0001f; // Snap to the vertical line
             ry = (px - rx) * nTan + py; 
             xo = -64; 
             yo = -xo * nTan; 
         }
         // Looking Right
         else { 
-            rx = (((int)px>>6)<<6) + 64; // Snap to the vertical line just right of player
+            rx = (((int)px>>6)<<6) + 64; // Snap to the vertical line
             ry = (px - rx) * nTan + py; 
             xo = 64; 
             yo = -xo * nTan; 
         }
-        // Looking Straight Up or Down (P2 or P3)
         if(fabsf(ra - P2) < 1e-6 || fabsf(ra - P3) < 1e-6) { rx = px; ry = py; dof = 8; } 
 
         while(dof < 8)
         {
             mx = (int)(rx) >> 6; my = (int)(ry) >> 6; mp = my * mapX + mx;
             if(mp >= 0 && mp < mapX*mapY) {
-                // If the ray hits a wall (1) OR a door (4), record the hit.
+                // If the ray hits a wall (1) OR a door (4)
                 if(map[mp] == 1 || map[mp] == 4) { 
                     vx = rx; vy = ry; disV = dist(px,py,vx,vy);
                     vMapValue = map[mp]; // Store map value
                     dof = 8; 
-                } else { // Ray passes through open space
+                } else {
                     rx += xo; ry += yo; dof++; 
                 }
             } else { rx += xo; ry += yo; dof++; } // Out of map bounds
         }
 
-        // --- Final Distance Selection & Fish-eye Correction ---
+        // Final Distance Selection & Fish-eye Correction
         if(disV < disH) { rx = vx; ry = vy; disT = disV; wallType = vMapValue; shade = 1.0f; }
         else { rx = hx; ry = hy; disT = disH; wallType = hMapValue; shade = 0.7f; }
 
@@ -370,7 +367,7 @@ void drawRays3D()
         ca = FixAng(ca); // Normalize
         disT *= cosf(ca); // Fish-eye correction
 
-        // Store distance in the depth buffer for sprite rendering
+        // Store distance in the depth buffer
         for(i = r*8; i < (r+1)*8 && i < 1024; i++) {
             depthBuffer[i] = disT;
         }
@@ -380,7 +377,7 @@ void drawRays3D()
         if(lineH > 512) lineH = 512;
         lineOff = 256.0f - lineH/2.0f;
 
-        // --- Draw Ceiling (T_3) ---
+        // Draw Ceiling (T_3)
         for(y = 0; y < (int)lineOff; y++)
         {
             float dy = 256.0f - y;
@@ -400,7 +397,7 @@ void drawRays3D()
             wx = px + cosf(currentRa) * ceilingDist;
             wy = py + sinf(currentRa) * ceilingDist;
             
-            // Map world coordinates to 32x32 texture coordinates
+            // Map world coordinates
             localX = ((int)wx) % 32;
             localY = ((int)wy) % 32;
             if(localX < 0) localX += 32;
@@ -418,14 +415,14 @@ void drawRays3D()
                 int blue  = T_3[ceilingPixel+2];
                 
                 glColor3ub((GLubyte)red, (GLubyte)green, (GLubyte)blue);
-                glPointSize(8); // Draw the pixel block (8x8)
+                glPointSize(8); // Draw the pixel block
                 glBegin(GL_POINTS);
                 glVertex2i(r*8, y);
                 glEnd();
             }
         }
 
-        // --- Wall Texture Calculation ---
+        // Wall Texture Calculation
         if(disV < disH) {
             // Vertical wall hit: X texture coordinate is based on Y world coordinate
             texX = ((int)ry) % 32;
@@ -438,7 +435,7 @@ void drawRays3D()
             shade = 0.7f; // Darker shade for horizontal walls
         }
         
-        // --- Draw Wall ---
+        // Draw Wall
         for(y = 0; y < (int)lineH; y++)
         {
             // Calculate Y texture coordinate
@@ -473,7 +470,7 @@ void drawRays3D()
             }
         }
 
-        // --- Draw Floor (T_2) ---
+        // Draw Floor (T_2)
         for(y = (int)(lineH + lineOff); y < 512; y++)
         {
             float dy = y - 256.0f;
@@ -526,7 +523,7 @@ void drawRays3D()
     
 }
 
-// --- SPRITE RENDERING (KEYS) ---
+// SPRITE RENDERING (KEYS)
 void drawSprite(Sprite *s, const unsigned char *tex, int texWidth, int texHeight)
 {
     float spx, spy;
@@ -577,7 +574,7 @@ void drawSprite(Sprite *s, const unsigned char *tex, int texWidth, int texHeight
     if(startY < 0) startY = 0;
     if(endY > 512) endY = 512;
     
-    // Draw the key sprite
+    // Draw key sprite
     for(x = startX; x < endX; x++)
     {
         if(x < 0 || x >= 1024) continue;
@@ -593,22 +590,22 @@ void drawSprite(Sprite *s, const unsigned char *tex, int texWidth, int texHeight
             
             int drawPixel = 0;
             
-            // Key head (circle at top)
+            // Key head
             float headCenterY = 0.25f;
             float headRadius = 0.15f;
             float distToHead = sqrtf((nx - 0.5f)*(nx - 0.5f) + (ny - headCenterY)*(ny - headCenterY));
             if(distToHead < headRadius) drawPixel = 1;
             
-            // Key hole (cutout in the head)
+            // Key hole
             float holeCenterY = 0.25f;
             float holeRadius = 0.06f;
             float distToHole = sqrtf((nx - 0.5f)*(nx - 0.5f) + (ny - holeCenterY)*(ny - holeCenterY));
             if(distToHole < holeRadius) drawPixel = 0;
             
-            // Key shaft (rectangle)
+            // Key shaft
             if(nx > 0.43f && nx < 0.57f && ny > 0.35f && ny < 0.75f) drawPixel = 1;
             
-            // Key teeth (bits at the bottom)
+            // Key teeth
             if(nx > 0.43f && nx < 0.50f && ny > 0.70f && ny < 0.78f) drawPixel = 1;
             if(nx > 0.43f && nx < 0.50f && ny > 0.82f && ny < 0.90f) drawPixel = 1;
             
@@ -625,7 +622,7 @@ void drawSprite(Sprite *s, const unsigned char *tex, int texWidth, int texHeight
     }
 }
 
-// --- LOGIC ---
+// LOGIC
 
 void updateMovement()
 {
@@ -657,7 +654,7 @@ void updateMovement()
         moved = 1;
     }
 
-    // Forward/Backward Movement
+    // Movement
     if(keyStates['w']) {
         newX += cosf(pa) * walkSpeed;
         newY += sinf(pa) * walkSpeed;
@@ -669,28 +666,28 @@ void updateMovement()
         moved = 1;
     }
 
-    // Collision check and update player position
+    // Collision check and update player
     if(!checkCollision(newX, newY))
     {
         px = newX;
         py = newY;
     }
     
-    // Check for key collection (Iterate through all required keys)
+    // Check for keys
     for(i = 0; i < keysRequired; i++)
     {
         if(keySprites[i].active)
         {
             float distToKey = dist(px, py, keySprites[i].x, keySprites[i].y);
-            if(distToKey < 20) // Proximity check
+            if(distToKey < 20) // Distance check
             {
                 keySprites[i].active = 0;
-                keysCollected++; // Increment collected count
+                keysCollected++;
             }
         }
     }
 
-    // Check if the player passed the exit check after moving
+    // Exit check
     if(playerPassedExitCheck)
     {
         gameWon = 1; // Win screen
@@ -720,7 +717,6 @@ void display()
     }
     else // (Maze + Keys)
     {
-        // Background Color
         glColor3f(0.2f, 0.2f, 0.2f);
         glBegin(GL_QUADS);
         glVertex2i(0, 0);
@@ -731,10 +727,9 @@ void display()
         
         drawRays3D();
         
-        // Draw key sprites
+        // Draw key sprite
         for(i = 0; i < keysRequired; i++)
         {
-            // Using NULL as texture argument since sprite is drawn procedurally
             drawSprite(&keySprites[i], NULL, 32, 32); 
         }
         
@@ -758,25 +753,25 @@ void display()
 void keyDown(unsigned char key, int x, int y)
 {
     float keyX, keyY;
-    int i; // Declared i here for C89 compliance
+    int i;
 
     if(gameWon)
     {
-        // Reset game state on any key press after winning
+        // Reset game state after winning
         gameWon = 0;
         gameStarted = 0;
         gameIntro = 0;
         keysCollected = 0;
         playerPassedExitCheck = 0;
         
-        // Reset player position and direction
+        // Reset player
         px = 1 * mapS + mapS/2;
         py = 1 * mapS + mapS/2;
         pa = 0;
         pdx = cosf(pa) * 5.0f;
         pdy = sinf(pa) * 5.0f;
         
-        // Re-initialize key states randomly
+        // Re-initialize key states
         keysRequired = (rand() % MAX_KEYS) + 1; // Keys required
 
         for(i = 0; i < keysRequired; i++)
@@ -821,12 +816,11 @@ void keyUp(unsigned char key, int x, int y)
 void timer(int value)
 {
     updateMovement();
-    glutTimerFunc(16, timer, 0); // ~60 FPS
+    glutTimerFunc(16, timer, 0);
 }
 
 void resize(int w, int h)
 {
-    // Set up 2D coordinate system (0,0 to 1024,512)
     glViewport(0, 0, w, h);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -841,19 +835,18 @@ void init()
     int i; 
     
     glClearColor(0.3f, 0.3f, 0.3f, 0);
-    // Initial ortho setup, will be called again by resize
     gluOrtho2D(0, 1024, 512, 0); 
 
     // Initial player position (center of tile 1,1)
     px = 1 * mapS + mapS/2;
     py = 1 * mapS + mapS/2;
 
-    pa = 0; // Initial angle 0 (looking right)
+    pa = 0; 
     pdx = cosf(pa) * 5.0f;
     pdy = sinf(pa) * 5.0f;
     
     // Initial key setup
-    keysRequired = (rand() % MAX_KEYS) + 1; // 1 to 5 keys required
+    keysRequired = (rand() % MAX_KEYS) + 1;
     keysCollected = 0;
     
     for(i = 0; i < keysRequired; i++)
@@ -873,7 +866,7 @@ void init()
 
 int main(int argc, char* argv[])
 {
-    // Random number generator
+    // RNG
     srand(time(NULL));
 
     glutInit(&argc, argv);
@@ -900,3 +893,4 @@ int main(int argc, char* argv[])
     glutMainLoop();
     return 0;
 }
+
